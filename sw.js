@@ -1,5 +1,5 @@
 // Uygulama dosyalarını önbelleğe alır; internet olmadan da açılır.
-const CACHE = 'doviz-v1';
+const CACHE = 'doviz-v2';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 

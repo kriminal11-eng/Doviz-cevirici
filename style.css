@@ -116,6 +116,11 @@ main { flex: 1; min-height: 0; position: relative; }
   padding: 10px 12px 8px;
   background: var(--bg);
 }
+.keypad.fx {
+  grid-template-areas: "k7 k8 k9 b" "k4 k5 k6 b" "k1 k2 k3 c" "z z d c";
+  grid-auto-rows: var(--key-h);
+}
+.keypad.fx .key { height: auto; }
 .key {
   height: var(--key-h); border-radius: 18px;
   background: var(--surface); font-size: 26px; font-weight: 500;

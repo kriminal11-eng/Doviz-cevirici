@@ -258,22 +258,35 @@ function numToExpr(n) {
 }
 
 /* ---------- Tuş takımı ---------- */
-const KEYS = [
+const CALC_KEYS = [
   ['C', 'fn'], ['()', 'fn'], ['%', 'fn'], ['÷', 'op'],
   ['7'], ['8'], ['9'], ['×', 'op'],
   ['4'], ['5'], ['6'], ['−', 'op'],
   ['1'], ['2'], ['3'], ['+', 'op'],
   ['⌫', 'fn'], ['0'], [','], ['=', 'eq'],
 ];
-function buildKeypad() {
+// Döviz sayfası: sadece rakam tuşları (işlem yok)
+const FX_KEYS = [
+  ['7'], ['8'], ['9'], ['⌫', 'fn'],
+  ['4'], ['5'], ['6'],
+  ['1'], ['2'], ['3'], ['C', 'fn'],
+  ['0'], [','],
+];
+function renderKeypad(tab) {
   const kp = document.getElementById('keypad');
-  for (const [k, cls] of KEYS) {
+  kp.className = 'keypad ' + tab;
+  kp.innerHTML = '';
+  for (const [k, cls] of (tab === 'fx' ? FX_KEYS : CALC_KEYS)) {
     const b = document.createElement('button');
     b.className = 'key' + (cls ? ' ' + cls : '');
     b.textContent = k === '()' ? '( )' : k;
     b.dataset.k = k;
+    if (tab === 'fx') b.style.gridArea = { '⌫': 'b', 'C': 'c', '0': 'z', ',': 'd' }[k] || 'k' + k;
     kp.appendChild(b);
   }
+}
+function buildKeypad() {
+  const kp = document.getElementById('keypad');
   kp.addEventListener('pointerdown', e => {
     const b = e.target.closest('.key');
     if (!b) return;
@@ -300,6 +313,7 @@ let favs = store.get('favs', ['TRY', 'USD', 'EUR', 'GBP', 'GAU']);
 let active = store.get('active', 'USD');
 let fxExpr = store.get('fxExpr', '1');
 if (!favs.includes(active)) active = favs[0];
+if (hasOp(fxExpr) || fxExpr.startsWith('−')) { const v = tryEval(fxExpr); fxExpr = v != null && v > 0 ? numToExpr(v) : '0'; }
 
 function convert(amount, from, to) {
   if (!rates || !rates[from] || !rates[to]) return NaN;
@@ -351,10 +365,8 @@ function setActive(code) {
 function saveFx() { store.set('favs', favs); store.set('active', active); store.set('fxExpr', fxExpr); }
 
 function fxKey(k) {
-  if (k === '=') {
-    const v = tryEval(fxExpr);
-    fxExpr = v == null ? '0' : numToExpr(v);
-  } else fxExpr = applyKey(fxExpr, k);
+  if (!/^[0-9,]$/.test(k) && k !== '⌫' && k !== 'C') return; // döviz sayfasında işlem yok
+  fxExpr = applyKey(fxExpr, k);
   saveFx();
   renderFx();
 }
@@ -473,8 +485,8 @@ function setupCalc() {
   document.getElementById('calc-to-fx').onclick = () => {
     const v = tryEval(calcExpr);
     if (v == null) return;
-    fxExpr = numToExpr(v); saveFx(); renderFx(); switchTab('fx');
-    toast(`${fmt(v, { max: 10 })} ${active} olarak aktarıldı`);
+    fxExpr = numToExpr(Math.abs(v)); saveFx(); renderFx(); switchTab('fx');
+    toast(`${fmt(Math.abs(v), { max: 10 })} ${active} olarak aktarıldı`);
   };
   document.getElementById('calc-history').addEventListener('click', e => {
     const it = e.target.closest('.h-item'); if (!it) return;
@@ -489,6 +501,7 @@ function switchTab(t) {
   store.set('tab', t);
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + t));
   document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  renderKeypad(t);
   document.getElementById('title').textContent = t === 'fx' ? 'Döviz' : 'Hesap Makinesi';
 }
 
