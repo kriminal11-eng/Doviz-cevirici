@@ -75,7 +75,13 @@ main { flex: 1; min-height: 0; position: relative; }
 .fx-code { font-weight: 700; font-size: 16px; }
 .fx-name { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .fx-val { flex: 1; min-width: 0; text-align: right; }
-.fx-amount { font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.fx-amount {
+  width: 100%; border: 0; outline: none; background: transparent; color: var(--text);
+  text-align: right; font: inherit; font-size: 22px; font-weight: 600; padding: 0;
+  text-overflow: ellipsis; font-variant-numeric: tabular-nums;
+  user-select: text; -webkit-user-select: text; caret-color: var(--accent);
+}
+.fx-amount::placeholder { color: var(--muted); }
 .fx-expr { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 14px; }
 .fx-row.active .fx-amount { color: var(--accent); }
 .fx-del {
@@ -116,11 +122,8 @@ main { flex: 1; min-height: 0; position: relative; }
   padding: 10px 12px 8px;
   background: var(--bg);
 }
-.keypad.fx {
-  grid-template-areas: "k7 k8 k9 b" "k4 k5 k6 b" "k1 k2 k3 c" "z z d c";
-  grid-auto-rows: var(--key-h);
-}
-.keypad.fx .key { height: auto; }
+.keypad[hidden] { display: none; }
+.key { height: auto; }
 .key {
   height: var(--key-h); border-radius: 18px;
   background: var(--surface); font-size: 26px; font-weight: 500;

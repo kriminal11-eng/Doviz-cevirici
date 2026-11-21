@@ -265,23 +265,15 @@ const CALC_KEYS = [
   ['1'], ['2'], ['3'], ['+', 'op'],
   ['⌫', 'fn'], ['0'], [','], ['=', 'eq'],
 ];
-// Döviz sayfası: sadece rakam tuşları (işlem yok)
-const FX_KEYS = [
-  ['7'], ['8'], ['9'], ['⌫', 'fn'],
-  ['4'], ['5'], ['6'],
-  ['1'], ['2'], ['3'], ['C', 'fn'],
-  ['0'], [','],
-];
 function renderKeypad(tab) {
   const kp = document.getElementById('keypad');
-  kp.className = 'keypad ' + tab;
-  kp.innerHTML = '';
-  for (const [k, cls] of (tab === 'fx' ? FX_KEYS : CALC_KEYS)) {
+  kp.hidden = tab === 'fx'; // döviz sayfasında tuş takımı yok
+  if (kp.childElementCount) return;
+  for (const [k, cls] of CALC_KEYS) {
     const b = document.createElement('button');
     b.className = 'key' + (cls ? ' ' + cls : '');
     b.textContent = k === '()' ? '( )' : k;
     b.dataset.k = k;
-    if (tab === 'fx') b.style.gridArea = { '⌫': 'b', 'C': 'c', '0': 'z', ',': 'd' }[k] || 'k' + k;
     kp.appendChild(b);
   }
 }
@@ -313,63 +305,82 @@ let favs = store.get('favs', ['TRY', 'USD', 'EUR', 'GBP', 'GAU']);
 let active = store.get('active', 'USD');
 let fxExpr = store.get('fxExpr', '1');
 if (!favs.includes(active)) active = favs[0];
-if (hasOp(fxExpr) || fxExpr.startsWith('−')) { const v = tryEval(fxExpr); fxExpr = v != null && v > 0 ? numToExpr(v) : '0'; }
+{ const v = tryEval(fxExpr); fxExpr = v != null && v > 0 ? cleanAmount(numToExpr(v)) : ''; }
 
 function convert(amount, from, to) {
   if (!rates || !rates[from] || !rates[to]) return NaN;
   return amount * rates[to] / rates[from];
 }
 
+// Klavyeden gelen metni temizle: "1.234,5" / "1234.5" → "1234,5"
+function cleanAmount(raw) {
+  let t = String(raw).replace(/[^0-9.,]/g, '');
+  if (t.includes(',')) t = t.replace(/\./g, '');
+  else if ((t.match(/\./g) || []).length > 1) t = t.replace(/\./g, '');
+  else t = t.replace('.', ',');
+  const i = t.indexOf(',');
+  if (i >= 0) t = t.slice(0, i + 1) + t.slice(i + 1).replace(/,/g, '');
+  t = t.replace(/^0+(?=\d)/, '');
+  return t.slice(0, 18);
+}
+const parseAmount = t => { const v = parseFloat(String(t).replace(',', '.')); return isFinite(v) ? v : 0; };
+const plainNum = v => !isFinite(v) || v === 0 ? '' : numToExpr(Math.round(v * 100) / 100 || v);
+
 function renderFx() {
   const list = document.getElementById('fx-list');
-  const amount = tryEval(fxExpr) ?? 0;
   list.innerHTML = '';
   for (const code of favs) {
     const li = document.createElement('li');
-    li.className = 'fx-row' + (code === active ? ' active' : '');
+    li.className = 'fx-row';
     li.dataset.code = code;
-    let amt, sub = '';
-    if (code === active) {
-      amt = hasOp(fxExpr) ? fmt(amount) : prettyExpr(fxExpr);
-      sub = hasOp(fxExpr) ? prettyExpr(fxExpr) : '';
-    } else {
-      const v = convert(amount, active, code);
-      amt = fmt(v);
-      const unit = convert(1, code, active);
-      sub = isFinite(unit) ? `1 ${code} = ${fmt(unit)} ${active}` : 'kur yok';
-    }
     li.innerHTML = `
       <div class="fx-flag">${curFlag(code)}</div>
       <div class="fx-id"><div class="fx-code">${code}</div><div class="fx-name">${curName(code)}</div></div>
-      <div class="fx-val"><div class="fx-amount">${amt}</div><div class="fx-expr">${sub}</div></div>
+      <div class="fx-val">
+        <input class="fx-amount" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="${curName(code)} tutarı">
+        <div class="fx-expr"></div>
+      </div>
       <button class="fx-del">Kaldır</button>`;
     list.appendChild(li);
   }
   if (!document.getElementById('fx-hint')) {
     const p = document.createElement('p');
     p.id = 'fx-hint'; p.className = 'hint';
-    p.textContent = 'Satıra dokun: o para birimini gir • Sola kaydır: kaldır';
+    p.textContent = 'Herhangi bir tutara dokunup yaz • Sola kaydır: kaldır';
     list.after(p);
   }
+  updateFxValues();
+}
+
+// Odaktaki kutuya dokunmadan diğer satırları günceller
+function updateFxValues() {
+  const amount = parseAmount(fxExpr);
+  document.querySelectorAll('.fx-row').forEach(li => {
+    const code = li.dataset.code;
+    const inp = li.querySelector('.fx-amount');
+    const sub = li.querySelector('.fx-expr');
+    li.classList.toggle('active', code === active);
+    if (code === active) {
+      if (document.activeElement !== inp) inp.value = fxExpr ? prettyExpr(fxExpr) : '';
+      sub.textContent = '';
+    } else {
+      inp.value = fxExpr ? fmt(convert(amount, active, code)) : '';
+      const unit = convert(1, code, active);
+      sub.textContent = isFinite(unit) ? `1 ${code} = ${fmt(unit)} ${active}` : 'kur yok';
+    }
+  });
 }
 
 function setActive(code) {
   if (code === active) return;
-  const amount = tryEval(fxExpr) ?? 0;
-  const v = convert(amount, active, code);
+  const v = convert(parseAmount(fxExpr), active, code);
   active = code;
-  fxExpr = isFinite(v) && v !== 0 ? numToExpr(Math.round(v * 100) / 100 || v) : '0';
+  fxExpr = plainNum(v);
   saveFx();
-  renderFx();
 }
 function saveFx() { store.set('favs', favs); store.set('active', active); store.set('fxExpr', fxExpr); }
 
-function fxKey(k) {
-  if (!/^[0-9,]$/.test(k) && k !== '⌫' && k !== 'C') return; // döviz sayfasında işlem yok
-  fxExpr = applyKey(fxExpr, k);
-  saveFx();
-  renderFx();
-}
+function fxKey() { /* döviz sayfasında tuş takımı yok; telefon klavyesi kullanılır */ }
 
 function setupFxList() {
   const list = document.getElementById('fx-list');
@@ -397,9 +408,33 @@ function setupFxList() {
       return;
     }
     if (r.classList.contains('show-del')) { r.classList.remove('show-del'); return; }
-    setActive(r.dataset.code);
+    const inp = r.querySelector('.fx-amount');
+    if (document.activeElement !== inp) inp.focus();
   };
   list.addEventListener('pointerup', end);
+  list.addEventListener('focusin', e => {
+    if (!e.target.classList.contains('fx-amount')) return;
+    const code = e.target.closest('.fx-row').dataset.code;
+    setActive(code);
+    const inp = e.target, v = fxExpr;
+    inp.value = v;
+    updateFxValues();
+    // yazınca eski tutarın yerine geçsin (kullanıcı yazmaya başladıysa dokunma)
+    inp.select();
+    setTimeout(() => { if (inp.value === v && document.activeElement === inp) inp.select(); }, 0);
+  });
+  list.addEventListener('input', e => {
+    if (!e.target.classList.contains('fx-amount')) return;
+    const clean = cleanAmount(e.target.value);
+    if (clean !== e.target.value) e.target.value = clean;
+    fxExpr = clean;
+    saveFx();
+    updateFxValues();
+  });
+  list.addEventListener('focusout', e => {
+    if (e.target.classList.contains('fx-amount')) updateFxValues();
+  });
+  list.addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
   list.addEventListener('pointercancel', () => { if (row) row.style.transform = ''; row = null; });
 }
 
@@ -485,7 +520,7 @@ function setupCalc() {
   document.getElementById('calc-to-fx').onclick = () => {
     const v = tryEval(calcExpr);
     if (v == null) return;
-    fxExpr = numToExpr(Math.abs(v)); saveFx(); renderFx(); switchTab('fx');
+    fxExpr = cleanAmount(numToExpr(Math.abs(v))); saveFx(); renderFx(); switchTab('fx');
     toast(`${fmt(Math.abs(v), { max: 10 })} ${active} olarak aktarıldı`);
   };
   document.getElementById('calc-history').addEventListener('click', e => {
@@ -507,7 +542,7 @@ function switchTab(t) {
 
 /* ---------- Klavye desteği (masaüstü) ---------- */
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || currentTab === 'fx') return;
   const map = { '*': '×', '/': '÷', '-': '−', '+': '+', '.': ',', ',': ',', Enter: '=', '=': '=', Backspace: '⌫', Escape: 'C', '%': '%', '(': '()', ')': '()' };
   const k = /^[0-9]$/.test(e.key) ? e.key : map[e.key];
   if (k) { e.preventDefault(); onKey(k); }
