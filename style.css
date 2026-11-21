@@ -92,6 +92,20 @@ main { flex: 1; min-height: 0; position: relative; }
 .fx-row.show-del .fx-del { display: block; }
 .fx-row.show-del .fx-val { visibility: hidden; }
 
+.fx-actions { display: flex; gap: 8px; margin-top: 10px; }
+.fx-actions .add-btn { flex: 1; margin-top: 0; }
+.add-btn.on { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.fx-edit { display: none; gap: 6px; margin-left: auto; }
+.fx-edit button {
+  width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2);
+  font-size: 16px; display: grid; place-items: center;
+}
+.fx-edit .fx-remove { background: var(--danger); color: #fff; font-size: 18px; }
+.fx-list.editing .fx-edit { display: flex; }
+.fx-list.editing .fx-val { display: none; }
+.fx-list.editing .fx-row { border-color: transparent; }
+.fx-list.editing .fx-row:first-child .fx-up,
+.fx-list.editing .fx-row:last-child .fx-down { opacity: .3; }
 .add-btn {
   margin-top: 10px; padding: 14px; border-radius: 14px;
   border: 1.5px dashed var(--line); color: var(--muted); font-size: 15px;

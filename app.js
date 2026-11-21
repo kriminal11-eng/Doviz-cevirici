@@ -340,16 +340,39 @@ function renderFx() {
         <input class="fx-amount" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="${curName(code)} tutarı">
         <div class="fx-expr"></div>
       </div>
+      <div class="fx-edit">
+        <button class="fx-up" aria-label="Yukarı taşı">▲</button>
+        <button class="fx-down" aria-label="Aşağı taşı">▼</button>
+        <button class="fx-remove" aria-label="Çıkar">✕</button>
+      </div>
       <button class="fx-del">Kaldır</button>`;
     list.appendChild(li);
   }
   if (!document.getElementById('fx-hint')) {
     const p = document.createElement('p');
     p.id = 'fx-hint'; p.className = 'hint';
-    p.textContent = 'Herhangi bir tutara dokunup yaz • Sola kaydır: kaldır';
+    p.textContent = 'Herhangi bir tutara dokunup yaz';
     list.after(p);
   }
+  list.classList.toggle('editing', editing);
+  list.querySelectorAll('.fx-amount').forEach(i => { i.readOnly = editing; });
   updateFxValues();
+}
+
+// Düzenleme modu: para birimlerini çıkar / sırala
+let editing = false;
+function toggleEdit(on = !editing) {
+  editing = on;
+  if (editing && document.activeElement) document.activeElement.blur();
+  document.getElementById('edit-cur').textContent = editing ? '✓ Bitti' : '✎ Düzenle / Çıkar';
+  document.getElementById('edit-cur').classList.toggle('on', editing);
+  renderFx();
+}
+function moveFav(code, dir) {
+  const i = favs.indexOf(code), j = i + dir;
+  if (j < 0 || j >= favs.length) return;
+  [favs[i], favs[j]] = [favs[j], favs[i]];
+  saveFx(); renderFx();
 }
 
 // Odaktaki kutuya dokunmadan diğer satırları günceller
@@ -399,9 +422,12 @@ function setupFxList() {
     if (!row) return;
     const r = row; row = null;
     r.style.transform = '';
-    if (e.target.closest('.fx-del')) {
+    if (e.target.closest('.fx-del') || e.target.closest('.fx-remove')) {
       removeFav(r.dataset.code); return;
     }
+    if (e.target.closest('.fx-up')) { moveFav(r.dataset.code, -1); return; }
+    if (e.target.closest('.fx-down')) { moveFav(r.dataset.code, 1); return; }
+    if (editing) return;
     if (swiping) {
       document.querySelectorAll('.fx-row.show-del').forEach(x => x !== r && x.classList.remove('show-del'));
       if (dx < -50) r.classList.add('show-del'); else r.classList.remove('show-del');
@@ -414,6 +440,7 @@ function setupFxList() {
   list.addEventListener('pointerup', end);
   list.addEventListener('focusin', e => {
     if (!e.target.classList.contains('fx-amount')) return;
+    if (editing) { e.target.blur(); return; }
     const code = e.target.closest('.fx-row').dataset.code;
     setActive(code);
     const inp = e.target, v = fxExpr;
@@ -440,6 +467,7 @@ function setupFxList() {
 
 function removeFav(code) {
   if (favs.length <= 2) { toast('En az 2 para birimi kalmalı'); renderFx(); return; }
+  toast(`${curName(code)} çıkarıldı`);
   favs = favs.filter(c => c !== code);
   if (active === code) { active = favs[0]; fxExpr = '1'; }
   saveFx(); renderFx();
@@ -471,7 +499,8 @@ function renderPicker(q) {
   }
 }
 function setupPicker() {
-  document.getElementById('add-cur').onclick = openPicker;
+  document.getElementById('add-cur').onclick = () => { toggleEdit(false); openPicker(); };
+  document.getElementById('edit-cur').onclick = () => toggleEdit();
   document.getElementById('picker-close').onclick = closePicker;
   document.getElementById('picker').addEventListener('click', e => { if (e.target.id === 'picker') closePicker(); });
   document.getElementById('picker-search').addEventListener('input', e => renderPicker(e.target.value));
@@ -532,6 +561,7 @@ function setupCalc() {
 
 /* ---------- Sekmeler ---------- */
 function switchTab(t) {
+  if (editing && t !== 'fx') toggleEdit(false);
   currentTab = t;
   store.set('tab', t);
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + t));
